@@ -1,7 +1,9 @@
 (in-package #:ot)
 
 (defgeneric encode (node hash)
-  (:documentation "Encode NODE to a hash-table."))
+  (:documentation "Encode NODE to a hash-table.")
+  (:method ((n top) hash)
+    (encode (first (children n)) hash)))
 
 (defmethod encode ((n is-parent) hash)
   (when (children n)

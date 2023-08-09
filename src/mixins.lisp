@@ -1,4 +1,14 @@
-(in-package #:to)
+(in-package #:ot)
+
+(defclass with-children ()
+  ((children
+    :accessor children
+    :initarg :children
+    :initform ()
+    :type list)))
+
+(defclass top (with-children)
+  ())
 
 (defclass with-key ()
   ((key
@@ -18,13 +28,8 @@
     :initarg :values 
     :type list)))
 
-(defclass is-parent (with-key)
-  ((children
-    :accessor children
-    :initarg :children
-    :initform ()
-    :type list)
-   (parent
+(defclass is-parent (with-children with-key)
+  ((parent
     :accessor parent
     :initarg :parent
     :initform nil)))

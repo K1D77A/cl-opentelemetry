@@ -1,4 +1,4 @@
-(in-package #:to)
+(in-package #:ot)
 
 (defclass instrumentation-scope (is-child with-attributes with-values with-key)
   ((name

@@ -5,8 +5,11 @@
 All spans from the same trace share the same `trace_id`. 
 
 ||#
-(defclass traces-data (is-parent)
-  ());;no encoding at all.
+(defclass traces-data (top)
+  ((trace-id
+    :accessor trace-id
+    :initarg :trace-id
+    :documentation "Toplevel trace container for all the others.")));;no encoding at all.
 
 (defclass spans (is-parent)
   ()
@@ -39,37 +42,46 @@ to set the same trace-id for them all.")
   (:default-initargs
    :key "scope"
    :trace-id
-   (ironclad:byte-array-to-hex-string (ironclad:random-data 16))
+   (random-bytes-as-hex 16)
    :span-id
-   (ironclad:byte-array-to-hex-string (ironclad:random-data 8))
+   (random-bytes-as-hex 8)
    :start-time (local-time:now)
    :status "unset"))
 
-(defclass scope (instrumentation-scope)
-  ()
-  (:default-initargs
-   :key "scope"))
-
-  
 (defmethod encode-values progn ((p span) hash)
   (with-slots (trace-id span-id start-time parent-span-id status end-time)
       p
-    (setf (gethash "trace_id" hash) trace-id
-          (gethash "span_id" hash) span-id
-          (gethash "start_time_unix_nano" hash)
+    (setf (gethash "traceId" hash) trace-id
+          (gethash "spanId" hash) span-id
+          (gethash "startTimeUnixNano" hash)
           (timestamp-to-unix-nano start-time)
-          (gethash "end_time_unix_nano" hash)
+          (gethash "endTimeUnixNano" hash)
           (timestamp-to-unix-nano end-time)
           (gethash "status" hash) status)
     (when parent-span-id
-      (setf (gethash "parent_span_id" hash) parent-span-id))))
+      (setf (gethash "parentSpanId" hash) parent-span-id))))
 
+(defclass scope (instrumentation-scope)
+  ((name
+    :initarg :name)
+   (version
+    :initarg :version))
+  (:default-initargs
+   :key "scope"
+   :name "qtscope"
+   :version "0.0.0"))
+
+(defmethod encode-values progn ((p scope) hash)
+  (with-slots (name version)
+      p
+    (setf (gethash "name" hash) name
+          (gethash "version" version) version)))
+  
 (defclass scope-span (is-parent with-attributes)
   ()
   (:default-initargs :key "scopeSpans"))
 ;;this is some instrumentionScope or something meaning it has some values.
 
-    
 (defclass events (is-parent)
   ()
   (:default-initargs :key "events"))
