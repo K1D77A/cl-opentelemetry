@@ -8,8 +8,15 @@
   :depends-on (#:shasht
                #:dexador
                #:alexandria
-               #:ironclad)
+               #:local-time
+               #:ironclad
+               #:str)
   :serial t
   :pathname "src"
   :components ((:file "package")
-               (:file "cl-opentelemetry")))
+               (:file "helpers")
+               (:file "encode")
+               (:file "mixins")
+               (:file "common")
+               (:file "resource")
+               (:file "trace")))
