@@ -17,6 +17,7 @@
                (:file "helpers")
                (:file "encode")
                (:file "mixins")
+               (:file "protocol")
                (:file "common")
                (:file "resource")
                (:file "trace")))

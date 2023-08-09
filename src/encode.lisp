@@ -15,23 +15,22 @@
 (defmethod encode ((n is-child) hash)
   ;;if it has a name then we encode (gethash <name> ..)
   ;;otherwise we make a new hash and encode the values into that.
-;;  (let ((new (encode-values n (make-hash-table :test #'equal))))
-    (if (has-key-p n)
-        (setf (gethash (key n) hash)
-              (encode-values n (make-hash-table :test #'equal)))
-        (encode-values n hash)))
+  (if (has-key-p n)
+      (setf (gethash (key n) hash)
+            (encode-values n (make-hash-table :test #'equal)))
+      (encode-values n hash)))
   
 
 (defun choose-type-name (val)
   (typecase val 
-    (string "stringValue")q
+    (string "stringValue")
     (integer "intValue")
     (float "doubleValue")
     (boolean "boolValue")))
 
 ;;https://github.com/open-telemetry/opentelemetry-proto/blob/main/examples/logs.json
-    ;;would have to do something special for array and map value
-    ;;here is the link they *DONT* have on their website
+;;would have to do something special for array and map value
+;;here is the link they *DONT* have on their website
     
 
 (defgeneric encode-values (node hash)

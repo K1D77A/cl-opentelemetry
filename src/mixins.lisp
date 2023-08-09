@@ -6,6 +6,12 @@
     :initarg :key
     :type string)))
 
+(defgeneric has-key-p (p)
+  (:method ((p with-key))
+    t)
+  (:method (p)
+    nil))
+
 (defclass with-values ()
   ((kv-pairs 
     :accessor kv-pairs
@@ -34,8 +40,3 @@
     :initarg :attributes
     :initform nil)))
 
-(defgeneric has-key-p (p)
-  (:method ((p with-key))
-    t)
-  (:method (p)
-    nil))

@@ -76,9 +76,4 @@ to set the same trace-id for them all.")
 
 (defclass event (is-child with-attributes with-values)
   ())
-   
-(defmethod add-child ((p is-parent) child)
-  (push child (children p))
-  (setf (children p) (nreverse (children p)))
-  (setf (parent child) p))
 
