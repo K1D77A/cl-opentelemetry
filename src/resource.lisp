@@ -9,11 +9,11 @@ noting this relationship will make inserting new children into the correct place
 
 ||#
 
-(defclass resource-spans (is-parent)
+(def-telemetry resource-spans top (is-parent)
   ()
   (:default-initargs :key "resourceSpans"))
 
-(defclass resource (is-child with-attributes with-key)
+(def-telemetry resource resource-spans (is-child with-attributes with-key)
   ()
   (:default-initargs :key "resource"
                      :attributes (make-resource-attributes)))

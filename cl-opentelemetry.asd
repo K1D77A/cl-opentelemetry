@@ -22,4 +22,5 @@
                (:file "protocol")
                (:file "common")
                (:file "resource")
-               (:file "trace")))
+               (:file "trace")
+               (:file "cl-opentelemetry")))

@@ -21,6 +21,7 @@
       (setf (gethash (key n) hash)
             (encode-values n (make-hash-table :test #'equal)))
       (encode-values n hash)))
+             
   
 
 (defun choose-type-name (val)
