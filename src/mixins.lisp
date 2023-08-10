@@ -19,9 +19,18 @@
   (:method (p)
     nil))
 
-
 (defclass top (with-children)
-  ())
+  ((store
+    :accessor store
+    :initform ()
+    :type list
+    :documentation "A plist of named elements.")
+   (shared-attributes
+    :accessor shared-attributes
+    :initarg :shared-attributes
+    :initform ()
+    :type list
+    :documentation "A plist of attributes shared between all children that have atts.")))
 
 (defgeneric topp (node)
   (:method ((p top))
