@@ -38,13 +38,21 @@
 
 (defgeneric encode-values (node hash)
   (:method-combination progn))
+
+(defparameter *dots* (make-hash-table :test #'eq))
+
+(declaim (inline encode-to-dots))
+(defun encode-to-dots (key)
+  (check-type key keyword)
+  (or (gethash key *dots*)
+      (setf (gethash key *dots*) (str:dot-case key))))
   
 (defmethod encode-values progn ((p with-attributes) hash)
   (let ((atts ()))
     (when (attributes p)
       (alexandria:doplist (key val (attributes p))
         (let ((hash (make-hash-table :test #'equal)))
-          (setf (gethash "key" hash) (str:dot-case key)
+          (setf (gethash "key" hash) (encode-to-dots key)
                 (gethash "value" hash)
                 (let ((h (make-hash-table :test #'equal)))
                   (setf (gethash (choose-type-name val) h) val)
@@ -53,9 +61,17 @@
       (setf (gethash "attributes" hash) atts)
       hash)))
 
+(defparameter *snakes* (make-hash-table :test #'eq))
+
+(declaim (inline encode-to-snake))
+(defun encode-to-snake (key)
+  (check-type key keyword)
+  (or (gethash key *snakes*)
+      (setf (gethash key *snakes*) (str:snake-case key))))
+
 (defmethod encode-values progn ((p with-values) hash)
   (alexandria:doplist (key val (kv-pairs p))
-    (setf (gethash (str:snake-case key) hash) val))
+    (setf (gethash (encode-to-snake key) hash) val))
   hash)
       
                                    

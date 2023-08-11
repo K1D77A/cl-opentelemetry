@@ -12,6 +12,7 @@
                #:alexandria
                #:local-time
                #:ironclad
+               #:bourdeaux-threads
                #:str)
   :serial t
   :pathname "src"

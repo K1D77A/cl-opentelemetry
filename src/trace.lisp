@@ -163,12 +163,14 @@ to set the same trace-id for them all.")
       (add-child scope-span spans)
       traces)))
 
-(defmacro with-new-trace ((trace-val spans-val &key resource-init scope-init shared-attributes)
+(defmacro with-new-trace ((trace-val spans-val &key (opentelemetry-instance '*ot*)
+                                                 resource-init scope-init shared-attributes)
                           &body body)
   `(let ((,trace-val (new-trace ,resource-init ,scope-init ,shared-attributes))
          (,spans-val ()))
      (declare (special ,trace-val ,spans-val))
-     (locally ,@body)))
+     (unwind-protect (locally ,@body)
+       (fire ,opentelemetry-instance ,trace-val))))
 
 (defmacro with-add-span ((trace-val spans-val) &body body)
   `(flet ((add-span (unique-id span-inits &optional parent-span-unique-id)
@@ -176,6 +178,9 @@ to set the same trace-id for them all.")
             (when (and (boundp ',trace-val)
                        (boundp ',spans-val))
               (check-type unique-id keyword)
+              (setf (getf span-inits :attributes)
+                    (append (shared-attributes ,trace-val)
+                            (getf span-inits :attributes)))
               (let* ((parent? (when parent-span-unique-id
                                 (getf ,spans-val parent-span-unique-id)))
                      (span (apply #'make-instance 'span 
@@ -183,8 +188,7 @@ to set the same trace-id for them all.")
                                          :parent-span-id (and parent?;;check for parent? 
                                                               (span-id parent?))
                                          :name (str:dot-case unique-id)
-                                         (append (shared-attributes ,trace-val)
-                                                 span-inits)))))
+                                         span-inits))))
                 (setf (getf ,spans-val unique-id) span)
                 (add-child (getf (store ,trace-val) :spans) span)
                 span))))
@@ -199,12 +203,11 @@ to set the same trace-id for them all.")
                        (boundp ',spans-val))
               (let ((parent (getf ,spans-val parent-span-unique-id)))
                 (with-accessors ((events events))
-                    parent            
-                  (let ((instance (apply #'make-instance 'event
-                                         (append initargs 
-                                                 (append (shared-attributes ,trace-val)
-                                                         (getf initargs :attributes))))))
-
+                    parent
+                  (setf (getf initargs :attributes)
+                        (append (shared-attributes ,trace-val)
+                                (getf initargs :attributes)))
+                  (let ((instance (apply #'make-instance 'event initargs)))
                     (unless events 
                       (let ((ev (make-instance 'events :parent parent)))
                         (setf events ev)))
@@ -216,7 +219,7 @@ to set the same trace-id for them all.")
 (defmacro with-span ((span-var unique-id initargs &optional parent-span-unique-id)
                      &body body)
   `(let* ((,span-var (add-span ,unique-id ,initargs ,parent-span-unique-id)))            
-     (prog1 (locally ,@body)
+     (unwind-protect (locally ,@body)
        (setf (end-time ,span-var) (local-time:now)))))
 
 (defun test ()
@@ -239,8 +242,19 @@ to set the same trace-id for them all.")
     (with-span (span :n (list :status '(:code 2 :message "TPD")
                               :attributes
                               '(:kn "yes")))
-      
-      (sleep 1))))
+      (handler-case (error "beep")
+        (serious-condition (c)
+          (let ((cs (format nil "~A" c))
+                (a (attributes span)))
+            (reinitialize-instance span
+                                   :status `(:code 3 :message ,cs)
+                                   :attributes (append (list :error-name
+                                                             (format nil "~A"
+                                                                     (class-name (class-of c)))
+                                                             :error-level "fuck"
+                                                             :error-message cs)
+                                                       a))
+            (error c)))))))
 
 
 (defun test3 ()
@@ -257,31 +271,18 @@ to set the same trace-id for them all.")
     (with-span (span
                 :unique-id
                 (list :status '(:code 2 :message "message")
-                      :attributes `(:error "true"
-                                    :error-name "599"
-                                    :error-level "warn"
-                                    :error-message "yes"))
+                      :attributes `()
                 :n2)
       (sleep (random 0.5))))
   ;;this needs to check for an 'events' object in the span we use...
   (with-add-event (*trace* *spans*)
     (dotimes (i 10)
-      (add-event :n2 :attributes '(:error.level "warn"
-                                   :error.message "weee"
-                                   :error.name "TND")
+      (add-event :n2 :attributes '(:error-level "warn"
+                                   :error-message "weee"
+                                   :error-name "TND")
                      :name (format nil "~D-weee" i)
                      :start-time (local-time:now))
       (sleep 0.1))
     *trace*))
 
 
-(defun test-fire ()
-  (let* ((hash (make-hash-table :test #'equal))
-         (test (test))
-         (encoded (encode test hash)))
-    (shasht:write-json hash t)
-    (dex:post *traces*
-              :headers '(("Content-Type" . "application/json"))
-              :content (shasht:write-json hash nil))))
-
-                      
