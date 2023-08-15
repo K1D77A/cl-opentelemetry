@@ -11,7 +11,13 @@ All spans from the same trace share the same `trace_id`.
     :accessor trace-id
     :initarg :trace-id
     :type (or null string)
-    :documentation "Toplevel trace container for all the others."))
+    :documentation "Toplevel trace container for all the others.")
+   (spans
+    :accessor spans
+    :initarg :spans
+    :initform ()
+    :type list
+    :documentation "plist of span ids to spans made for this trace."))
   (:default-initargs
    :trace-id (random-bytes-as-hex 16)));;no encoding at all.
 
@@ -189,47 +195,52 @@ to set the same trace-id for them all.")
       (add-child scope-span spans)
       traces)))
 
-(defmacro with-new-trace ((trace-val spans-val &key (resource (make-instance 'resource))
-                                                 (scope (make-instance 'scope)))
+(defmacro with-new-trace ((trace-val &key (resource (make-instance 'resource))
+                                       (scope (make-instance 'scope)))
                           shared-attributes
                           &body body)
-  `(let ((,trace-val (new-trace ,resource ,scope ,shared-attributes))
-         (,spans-val ()))
-     (declare (special ,trace-val ,spans-val))
+  "Initiate a new trace. TRACE-VAL is a symbol that is declared special
+and are then used by the #'with-add-* macros in order to properly associated/place certain
+objects. SHARED-ATTRIBUTES is a plist of keyword -> values that are shared between every
+ instance of span and event created for this new trace."
+  `(let ((,trace-val (new-trace ,resource ,scope ,shared-attributes)))
+     (declare (special ,trace-val))
      (unwind-protect (locally ,@body)
        (fire *ot* ,trace-val))))
 
-(defmacro with-add-span ((trace-val spans-val) &body body)
+(defmacro with-add-span ((trace-val) &body body)
+    "Given appropriate TRACE-VAL make a function #'add-span available in BODY.
+This function correctly adds an instance of 'span to the trace and sets the correct parent
+for the span when the parents ID is provided."
   `(flet ((add-span (unique-id span-inits &optional parent-span-unique-id)
-            (declare (special ,trace-val ,spans-val))
-            (when (and (boundp ',trace-val)
-                       (boundp ',spans-val))
+            (declare (special ,trace-val))
+            (when (boundp ',trace-val)
               (check-type unique-id keyword)
               (setf (getf span-inits :attributes)
                     (append (shared-attributes ,trace-val)
                             (getf span-inits :attributes)))
               (let* ((parent? (when parent-span-unique-id
-                                (getf ,spans-val parent-span-unique-id)))
+                                (getf (spans ,trace-val) parent-span-unique-id)))
                      (span (apply #'make-instance 'span 
                                   (list* :trace-id (trace-id ,trace-val)
                                          :parent-span-id (and parent?;;check for parent? 
                                                               (span-id parent?))
                                          :name (str:dot-case unique-id)
                                          span-inits))))
-                (setf (getf ,spans-val unique-id) span)
+                (setf (getf (spans ,trace-val) unique-id) span)
                 (add-child (getf (store ,trace-val) :spans) span)
                 span))))
-     (declare (special ,trace-val ,spans-val))
+     (declare (special ,trace-val))
      (locally ,@body)))
 
-(defmacro with-add-event ((trace-val spans-val) &body body)
+(defmacro with-add-event ((trace-val) &body body)
+  "Given appropriate TRACE-VAL make a function #'add-event available in BODY.
+This function correctly adds an instance of 'event to the correct span."
   `(flet ((add-event (parent-span-unique-id initargs)
-            (declare (special ,trace-val ,spans-val))
-            ;;need to add 'events'
-            (when (and (boundp ',trace-val)
-                       (boundp ',spans-val))
+            (declare (special ,trace-val))
+            (when (boundp ',trace-val)
               (check-type parent-span-unique-id keyword)
-              (let ((parent (getf ,spans-val parent-span-unique-id)))
+              (let ((parent (getf (spans ,trace-val) parent-span-unique-id)))
                 (with-accessors ((events events))
                     parent
                   (setf (getf initargs :attributes)
@@ -242,7 +253,7 @@ to set the same trace-id for them all.")
                         (setf events ev)))
                     (add-child events instance)
                     instance))))))
-     (declare (special ,trace-val ,spans-val))
+     (declare (special ,trace-val))
      (locally ,@body)))
 
 (defmethod handle-execution-condition (opentelemetry (s span) condition)

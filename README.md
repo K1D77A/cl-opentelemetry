@@ -76,7 +76,7 @@ and use the macro `with-new-trace` to initialize a trace.
 ```lisp
   (let ((scope (make-instance 'scope))
         (resource (make-instance 'resource :attributes '(:service.name "qtservice2"))))
-    (with-new-trace (*trace* *spans* :scope scope :resource resource)
+    (with-new-trace (*trace* :scope scope :resource resource)
                     `(:service-id "r.y.m"
                       :status ,(to-status-code :ok)
                       :service-name "demonstration"
