@@ -28,4 +28,5 @@
            #:write-json
            #:attributes
            #:values
-           #:make-request))
+           #:make-request
+           #:make-resource-attributes))

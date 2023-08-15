@@ -6,8 +6,6 @@ The overhead for spawning a new thread seems so miniscule that our #'fire functi
 spawn a new thread.
 ||#
 
-
-
 (defgeneric record (opentelemetry top)
   (:documentation "Record that you fired a TOP.")
   (:method (ot top)

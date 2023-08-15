@@ -1,9 +1,7 @@
 (in-package #:ot)
 
-
 #||
-All spans from the same trace share the same `trace_id`. 
-
+Implementing tracing in a nice way
 ||#
 
 (def-telemetry traces-data nil (top)
@@ -42,7 +40,6 @@ All spans from the same trace share the same `trace_id`.
     (setf (gethash "name" hash) name
           (gethash "version" hash) version)))
   
-
 (def-telemetry spans scope-spans (is-parent)
   ()
   (:default-initargs :key "spans"))
@@ -57,8 +54,6 @@ All spans from the same trace share the same `trace_id`.
     (:producer 4)
     (:consumer 5)))
 
-
-              
 (def-telemetry span spans (is-child with-attributes with-values
                                     with-unique-id)
   ((name
@@ -151,8 +146,6 @@ to set the same trace-id for them all.")
     (when parent-span-id
       (setf (gethash "parentSpanId" hash) parent-span-id))))
 
-
-
 (def-telemetry events span (is-parent)
   ()  
   (:default-initargs :key "events"))
@@ -173,8 +166,6 @@ to set the same trace-id for them all.")
     (setf (gethash "name" hash) name
           (gethash "timeUnixNano" hash)
           (timestamp-to-unix-nano start-time))))
-
-  
 
 (defun new-trace (resource scope &optional shared-attributes)
   (check-type resource resource)

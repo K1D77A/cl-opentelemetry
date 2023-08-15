@@ -25,12 +25,10 @@
     (push child (children p))
     (setf (parent child) p)))
 
-
 (defgeneric handle-execution-condition (opentelemetry element condition)
   (:documentation "Handle a condition from within body of with-span and with-event")
   (:method :after (ot element condition)
     (error condition)))
-
 
 (defgeneric write-json (opentelemetry json &optional stream)
   (:documentation "Specialize me to export your traces. JSON is a hash-table."))
