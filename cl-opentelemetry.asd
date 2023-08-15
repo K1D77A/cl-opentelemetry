@@ -1,15 +1,13 @@
 ;;;; cl-opentelemetry.asd
 
-(defparameter *version* "0.0.1")
+(defparameter *version* "0.0.2")
 
 (asdf:defsystem #:cl-opentelemetry
   :description "Implementing some of the Opentelemetry API"
   :author "K1D77A"
   :license  "MIT"
   :version #.*version*
-  :depends-on (#:shasht
-               #:dexador
-               #:alexandria
+  :depends-on (#:alexandria
                #:local-time
                #:ironclad
                #:bordeaux-threads

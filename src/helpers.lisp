@@ -14,11 +14,6 @@
 (defun random-bytes-as-hex (n)
   (ironclad:byte-array-to-hex-string (ironclad:random-data n)))
 
-
-(defun write-json (json &optional stream)
-  (let ((*print-pretty* nil))
-    (shasht:write-json json stream)))
-
 (defmacro safe-format ((fail-phrase) destination control-string &rest format-arguments)
   `(handler-case
        (format ,destination ,control-string ,@format-arguments)

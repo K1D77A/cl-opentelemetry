@@ -19,4 +19,11 @@
            #:fire
            #:encode
            #:write-json
-           ))
+           #:scope
+           #:resource
+           #:event
+           #:span
+           #:*version*
+           #:make-status
+           #:write-json
+           #:make-request))

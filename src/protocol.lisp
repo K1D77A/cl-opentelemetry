@@ -30,3 +30,11 @@
   (:documentation "Handle a condition from within body of with-span and with-event")
   (:method :after (ot element condition)
     (error condition)))
+
+
+(defgeneric write-json (opentelemetry json &optional stream)
+  (:documentation "Specialize me to export your traces. JSON is a hash-table."))
+
+(defgeneric make-request (opentelemetry content)
+  (:documentation "Specialize me to make a HTTP request.
+CONTENT is the encoded JSON as a string."))
