@@ -18,3 +18,9 @@
 (defun write-json (json &optional stream)
   (let ((*print-pretty* nil))
     (shasht:write-json json stream)))
+
+(defmacro safe-format ((fail-phrase) destination control-string &rest format-arguments)
+  `(handler-case
+       (format ,destination ,control-string ,@format-arguments)
+     (serious-condition ()
+       ,fail-phrase)))

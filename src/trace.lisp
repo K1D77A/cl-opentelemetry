@@ -246,7 +246,7 @@ to set the same trace-id for them all.")
      (locally ,@body)))
 
 (defmethod handle-execution-condition (opentelemetry (s span) condition)
-  (let ((cs (format nil "~A" condition))
+  (let ((cs (safe-format ("~~Cannot output message~~") nil "~A" condition))
         (a (attributes s)))
     (reinitialize-instance
      s
@@ -257,7 +257,7 @@ to set the same trace-id for them all.")
                          a))))
 
 (defmethod handle-execution-condition (opentelemetry (e event) condition)
-  (let ((cs (format nil "~A" condition))
+  (let ((cs (safe-format ("~~Cannot output message~~") nil "~A" condition))
         (a (attributes e)))
     (reinitialize-instance
      e
