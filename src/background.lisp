@@ -15,25 +15,25 @@ spawn a new thread.
   (format *debug-io* "Sending trace: ~A to ~A. Backgroundp: ~A.~%"
           (trace-id top) (traces-url ot) (backgroundp ot)))
 
+(defgeneric handle-failed-request (opentelemetry condition top)
+  (:method (opentelemetry condition top)
+    (format *debug-io* "Failed to send.~%Status: ~D.~%Body: ~A.~%."
+            (dex:response-status condition)
+            (dex:response-body condition))))
+
 (defun fire (opentelemetry top)
   "Takes in some tree, encodes it and sends it."
   (record opentelemetry top)
   (flet ((doit ()
            (let* ((hash (make-hash-table :test #'equal)))
              (encode top hash)
-             (dex:post (traces-url opentelemetry)
-                       :headers '(("Content-Type" . "application/json"))
-                       :content (write-json hash)))))
+             (handler-case (dex:post (traces-url opentelemetry)
+                                     :headers '(("Content-Type" . "application/json"))
+                                     :content (write-json hash))
+               (dex:http-request-failed (c)
+                 (handle-failed-request opentelemetry c top))))))                 
     (if (backgroundp opentelemetry)
         (bt2:make-thread
          (lambda ()
            (doit)))
         (doit))))
-
-
-  
-  
-
-
-
-

@@ -15,6 +15,7 @@
            #:traces-url
            #:backgroundp
            #:record
+           #:handle-failed-request
            #:fire
            #:encode
            #:write-json
