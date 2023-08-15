@@ -16,10 +16,13 @@ spawn a new thread.
           (trace-id top) (traces-url ot) (backgroundp ot)))
 
 (defgeneric handle-failed-request (opentelemetry condition top)
-  (:method (opentelemetry condition top)
+  (:method (opentelemetry (condition dex:http-request-failed) top)
     (format *debug-io* "Failed to send.~%Status: ~D.~%Body: ~A.~%."
             (dex:response-status condition)
-            (dex:response-body condition))))
+            (dex:response-body condition)))
+  (:method (opentelemetry condition top)
+    (format *debug-io* "Failed to send. ~A"
+            condition)))
 
 (defun fire (opentelemetry top)
   "Takes in some tree, encodes it and sends it."
@@ -30,8 +33,8 @@ spawn a new thread.
              (handler-case (dex:post (traces-url opentelemetry)
                                      :headers '(("Content-Type" . "application/json"))
                                      :content (write-json hash))
-               (dex:http-request-failed (c)
-                 (handle-failed-request opentelemetry c top))))))                 
+               (serious-condition (c)
+                 (handle-failed-request opentelemetry c top))))))
     (if (backgroundp opentelemetry)
         (bt2:make-thread
          (lambda ()
