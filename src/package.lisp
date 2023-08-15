@@ -26,4 +26,6 @@
            #:*version*
            #:make-status
            #:write-json
+           #:attributes
+           #:values
            #:make-request))
