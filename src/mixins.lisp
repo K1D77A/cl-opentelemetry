@@ -32,6 +32,8 @@
     :type list
     :documentation "A plist of attributes shared between all children that have atts.")))
 
+(c2mop:ensure-finalized (find-class 'top))
+
 (defgeneric topp (node)
   (:method ((p top))
     t)

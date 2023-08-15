@@ -12,7 +12,7 @@
                #:alexandria
                #:local-time
                #:ironclad
-               #:bourdeaux-threads
+               #:bordeaux-threads
                #:str)
   :serial t
   :pathname "src"
@@ -24,4 +24,5 @@
                (:file "common")
                (:file "resource")
                (:file "trace")
+               (:file "background")
                (:file "cl-opentelemetry")))

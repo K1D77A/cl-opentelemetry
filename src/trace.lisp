@@ -40,6 +40,18 @@ All spans from the same trace share the same `trace_id`.
 (def-telemetry spans scope-spans (is-parent)
   ()
   (:default-initargs :key "spans"))
+
+(defun to-kind (symbolic)
+  (check-type symbolic keyword)
+  (ecase symbolic
+    (:unspecific 0)
+    (:internal 1)
+    (:server 2)
+    (:client 3)
+    (:producer 4)
+    (:consumer 5)))
+
+
               
 (def-telemetry span spans (is-child with-attributes with-values
                                     with-unique-id)
@@ -65,13 +77,12 @@ to set the same trace-id for them all.")
    (kind
     :accessor kind
     :initarg :kind
-    :initform nil
-    :type (or null string))
+    :initform :server
+    :type keyword)
    (status
     :accessor status
     :initarg :status
-    :initform ()
-    :type list)
+    :type hash-table)
    (start-time
     :accessor start-time
     :initarg :start-time)
@@ -89,12 +100,31 @@ to set the same trace-id for them all.")
    :span-id
    (random-bytes-as-hex 8)
    :start-time (local-time:now)
+   :kind :server
    :events nil
-   :status '(:code 1 :message "λ Made with alien tech λ")))
+   :status (make-status :ok "λ Made with alien tech λ")))
 
+(defun to-status-code (symbolic)
+  (check-type symbolic keyword)
+  (ecase symbolic
+    (:unset 0)
+    (:ok 1)
+    (:error 2)))
+
+(defun make-status (code message)
+  (check-type code keyword)
+  (check-type message string)
+  (let ((hash (make-hash-table :test #'equal :size 2)))
+    (setf (gethash "code" hash)
+          (to-status-code code)
+          (gethash "message" hash)
+          message)
+    hash))
 
 (defmethod encode-values progn ((p span) hash)
-  (with-slots (trace-id span-id start-time parent-span-id status end-time name events)
+  (with-slots (trace-id span-id start-time
+               parent-span-id status end-time
+               name events kind)
       p
     (setf (gethash "traceId" hash) trace-id
           (gethash "spanId" hash) span-id
@@ -104,18 +134,14 @@ to set the same trace-id for them all.")
           (timestamp-to-unix-nano end-time)
           (gethash "name" hash) name
           (gethash "error" hash) "true"
-          (gethash "kind" hash) 2)
+          (gethash "kind" hash) (to-kind kind))
     (when events
       (setf (gethash "events" hash)
             (mapcar (lambda (ev)
                       (encode-values ev (make-hash-table :test #'equal)))
                     (children events))))
     (when status
-      (setf (gethash "status" hash)
-            (let ((hash (make-hash-table :test #'equal)))
-              (setf (gethash "status" hash) (getf status :code)
-                    (gethash "message" hash) (getf status :message))
-              hash)))                          
+      (setf (gethash "status" hash) status))
     (when parent-span-id
       (setf (gethash "parentSpanId" hash) parent-span-id))))
 
@@ -144,13 +170,13 @@ to set the same trace-id for them all.")
 
   
 
-(defun new-trace (resource-init scope-init &optional shared-attributes)
+(defun new-trace (resource scope &optional shared-attributes)
+  (check-type resource resource)
+  (check-type scope scope)
   (let ((traces (make-instance 'traces-data :shared-attributes shared-attributes))
         (resource-span (make-instance 'resource-spans))
-        (resource (apply #'make-instance 'resource resource-init))
-        (scope-span (make-instance 'scope-span))
-        (spans (make-instance 'spans))
-        (scope (apply #'make-instance 'scope scope-init)))
+        (scope-span (make-instance 'scope-spans))
+        (spans (make-instance 'spans)))
     (with-accessors ((store store))
         traces 
       (setf (getf store :resource-span) resource-span
@@ -163,14 +189,15 @@ to set the same trace-id for them all.")
       (add-child scope-span spans)
       traces)))
 
-(defmacro with-new-trace ((trace-val spans-val &key (opentelemetry-instance '*ot*)
-                                                 resource-init scope-init shared-attributes)
+(defmacro with-new-trace ((trace-val spans-val &key (resource (make-instance 'resource))
+                                                 (scope (make-instance 'scope)))
+                          shared-attributes
                           &body body)
-  `(let ((,trace-val (new-trace ,resource-init ,scope-init ,shared-attributes))
+  `(let ((,trace-val (new-trace ,resource ,scope ,shared-attributes))
          (,spans-val ()))
      (declare (special ,trace-val ,spans-val))
      (unwind-protect (locally ,@body)
-       (fire ,opentelemetry-instance ,trace-val))))
+       (fire *ot* ,trace-val))))
 
 (defmacro with-add-span ((trace-val spans-val) &body body)
   `(flet ((add-span (unique-id span-inits &optional parent-span-unique-id)
@@ -196,11 +223,12 @@ to set the same trace-id for them all.")
      (locally ,@body)))
 
 (defmacro with-add-event ((trace-val spans-val) &body body)
-  `(flet ((add-event (parent-span-unique-id &rest initargs)
+  `(flet ((add-event (parent-span-unique-id initargs)
             (declare (special ,trace-val ,spans-val))
             ;;need to add 'events'
             (when (and (boundp ',trace-val)
                        (boundp ',spans-val))
+              (check-type parent-span-unique-id keyword)
               (let ((parent (getf ,spans-val parent-span-unique-id)))
                 (with-accessors ((events events))
                     parent
@@ -208,6 +236,7 @@ to set the same trace-id for them all.")
                         (append (shared-attributes ,trace-val)
                                 (getf initargs :attributes)))
                   (let ((instance (apply #'make-instance 'event initargs)))
+                    (setf (start-time instance) (local-time:now))
                     (unless events 
                       (let ((ev (make-instance 'events :parent parent)))
                         (setf events ev)))
@@ -216,73 +245,47 @@ to set the same trace-id for them all.")
      (declare (special ,trace-val ,spans-val))
      (locally ,@body)))
 
-(defmacro with-span ((span-var unique-id initargs &optional parent-span-unique-id)
+(defmethod handle-execution-condition (opentelemetry (s span) condition)
+  (let ((cs (format nil "~A" condition))
+        (a (attributes s)))
+    (reinitialize-instance
+     s
+     :status (make-status :error "Condition Signalled")
+     :attributes (append (list :error-name
+                               (format nil "~A" (class-name (class-of condition)))
+                               :error-message cs)
+                         a))))
+
+(defmethod handle-execution-condition (opentelemetry (e event) condition)
+  (let ((cs (format nil "~A" condition))
+        (a (attributes e)))
+    (reinitialize-instance
+     e
+     :attributes (append (list :error-name
+                               (format nil "~A" (class-name (class-of condition)))
+                               :error-message cs)
+                         a))))   
+
+(defmacro with-span ((span-var unique-id &optional parent-span-unique-id)
+                      span-initargs
                      &body body)
-  `(let* ((,span-var (add-span ,unique-id ,initargs ,parent-span-unique-id)))            
-     (unwind-protect (locally ,@body)
-       (setf (end-time ,span-var) (local-time:now)))))
+  (check-type parent-span-unique-id (or null keyword))
+  `(let ((,span-var (add-span ,unique-id ,span-initargs ,parent-span-unique-id)))
+     (handler-case
+         (unwind-protect (locally ,@body)
+           (setf (end-time ,span-var) (local-time:now)))
+       (serious-condition (c)
+         (handle-execution-condition *ot* ,span-var c)))))
 
-(defun test ()
-  (with-new-trace
-      (*trace* *spans*
-       :scope-init '(:name "qtscope2" :version "0.0.1")
-       :resource-init '(:attributes (:service.name "qtservice2"))
-       :shared-attributes `(:service-id "r.y.m"
-                            :status 2
-                            :service-name "demonstration"
-                            :telemetry-sdk-name "cl-opentelemetry"
-                            :telemetry-sdk-version ,*version* 
-                            :telemetry-sdk-language "Common Lisp"))
-    (test2)
-    (test3)
-    (test4)))
+(defmacro with-event ((event-var parent-id)
+                      initargs
+                      &body body)
+  (check-type parent-id keyword)
+  `(let ((,event-var (add-event ,parent-id ,initargs)))
+     (declare (ignorable ,event-var))
+     (handler-case (locally ,@body)
+       (serious-condition (c)
+         (handle-execution-condition *ot* ,event-var c)))))
 
-(defun test2 ()
-  (with-add-span (*trace* *spans*)
-    (with-span (span :n (list :status '(:code 2 :message "TPD")
-                              :attributes
-                              '(:kn "yes")))
-      (handler-case (error "beep")
-        (serious-condition (c)
-          (let ((cs (format nil "~A" c))
-                (a (attributes span)))
-            (reinitialize-instance span
-                                   :status `(:code 3 :message ,cs)
-                                   :attributes (append (list :error-name
-                                                             (format nil "~A"
-                                                                     (class-name (class-of c)))
-                                                             :error-level "fuck"
-                                                             :error-message cs)
-                                                       a))
-            (error c)))))))
-
-
-(defun test3 ()
-  (with-add-span (*trace* *spans*)
-    (with-span (span
-                :n2
-                (list :status '(:code 2 :message "TPD")
-                      :attributes '())
-                :n)
-      (sleep 0.25))))
-
-(defun test4 ()
-  (with-add-span (*trace* *spans*)
-    (with-span (span
-                :unique-id
-                (list :status '(:code 2 :message "message")
-                      :attributes `()
-                :n2)
-      (sleep (random 0.5))))
-  ;;this needs to check for an 'events' object in the span we use...
-  (with-add-event (*trace* *spans*)
-    (dotimes (i 10)
-      (add-event :n2 :attributes '(:error-level "warn"
-                                   :error-message "weee"
-                                   :error-name "TND")
-                     :name (format nil "~D-weee" i)
-                     :start-time (local-time:now))
-      (sleep 0.1))
-    *trace*))
 
 
