@@ -27,7 +27,7 @@ spawn a new thread.
                (serious-condition (c)
                  (handle-failed-request opentelemetry c top))))))
     (if (backgroundp opentelemetry)
-        (bt2:make-thread
+        (bt:make-thread
          (lambda ()
            (doit)))
         (doit))))

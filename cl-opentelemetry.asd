@@ -11,6 +11,7 @@
                #:local-time
                #:ironclad
                #:bordeaux-threads
+               #:closer-mop
                #:str)
   :serial t
   :pathname "src"
